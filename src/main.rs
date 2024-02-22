@@ -1,4 +1,5 @@
-use poise::serenity_prelude as serenity;
+use poise::serenity_prelude::{self as serenity};
+use poise::serenity_prelude::Colour;
 
 use jsonrpsee::core::client::ClientT;
 use jsonrpsee::rpc_params;
@@ -30,15 +31,28 @@ async fn age(
 async fn cf_version(
     ctx: Context<'_>
 ) -> Result<(), Error> {
+    //ctx.defer().await?;
+
     let response: String = ctx.data().http_client.request("system_version", rpc_params![]).await.expect("request failed");
-    ctx.say(response).await?;
+    //ctx.say(response).await?;
+    ctx.send(poise::CreateReply::default()
+    .content("Works for slash and prefix commands")
+    .embed(serenity::CreateEmbed::new()
+        .title("Much versatile, very wow")
+        .colour(Colour::DARK_GREEN)
+        .field("Version", response, true)
+        .url("http://jitstrategies.com")
+    )
+    .ephemeral(false) // this one only applies in application commands though
+    ).await?;
     Ok(())
 }
 
 
 #[tokio::main]
-async fn main() {
-    let token = std::env::var("DISCORD_TOKEN").expect("missing DISCORD_TOKEN");
+async fn main() -> Result<(), Error> {
+    let token = std::env::var("JITCORD_DISCORD_TOKEN").expect("missing JITCORD_DISCORD_TOKEN env var!");
+    let target = std::env::var("JITCORD_TARGET").expect("missing JITCORD_TARGET env var!");
     let intents = serenity::GatewayIntents::non_privileged();
 
     let framework = poise::Framework::builder()
@@ -49,7 +63,7 @@ async fn main() {
         .setup(|ctx, _ready, framework| {
             Box::pin(async move {
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
-                let client = HttpClientBuilder::default().build("https://cf-berghain.jitstrategies.xyz").unwrap();
+                let client = HttpClientBuilder::default().build(target).unwrap();
                 Ok(Data {http_client: client})
             })
         })
@@ -59,4 +73,5 @@ async fn main() {
         .framework(framework)
         .await;
     client.unwrap().start().await.unwrap();
+    Ok(())
 }
