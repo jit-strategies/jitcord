@@ -1,8 +1,8 @@
 mod commands;
 mod util;
 
-use poise::serenity_prelude::{self as serenity};
 use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
+use poise::serenity_prelude::{self as serenity};
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
@@ -13,7 +13,8 @@ pub struct Data {
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    let token = std::env::var("JITCORD_DISCORD_TOKEN").expect("missing JITCORD_DISCORD_TOKEN env var!");
+    let token =
+        std::env::var("JITCORD_DISCORD_TOKEN").expect("missing JITCORD_DISCORD_TOKEN env var!");
     let target = std::env::var("JITCORD_TARGET").expect("missing JITCORD_TARGET env var!");
     let intents = serenity::GatewayIntents::non_privileged();
 
@@ -30,7 +31,9 @@ async fn main() -> Result<(), Error> {
             Box::pin(async move {
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
                 let client = HttpClientBuilder::default().build(target).unwrap();
-                Ok(Data {http_client: client})
+                Ok(Data {
+                    http_client: client,
+                })
             })
         })
         .build();
