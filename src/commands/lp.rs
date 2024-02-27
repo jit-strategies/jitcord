@@ -6,9 +6,7 @@ use serenity::Colour;
 use serde::Deserialize;
 use web3::types::U256;
 use crate::{Context, Error};
-use crate::util::util::{shorten_address,asset_in_amount};
-
-use rust_decimal::prelude::*;
+use crate::util::util::{shorten_address, asset_in_amount, tick_to_price};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "")]
@@ -83,12 +81,11 @@ pub async fn orders(
         .embed(serenity::CreateEmbed::new()
             .title(format!("Highest Bid {}-{}", asset.to_uppercase(), &quote))
             .colour(Colour::DARK_GREEN)
-            // TODO: use some util to shorten IDs
             .field("LP", format!("{}",shorten_address(&highest_bid.lp)), true)
             .field("ID", format!("{}",highest_bid.id), true)
             .field("Tick", format!("{}",highest_bid.tick), true)
-            // TODO: Add unit conversion
-            .field("Sell amount", format!("{}",asset_in_amount(highest_bid.sell_amount, &quote)), true)
+            .field("Price", format!("{}",tick_to_price(highest_bid.tick,&asset.to_uppercase(),&quote)), true)
+            .field("Sell amount", format!("{}",asset_in_amount(highest_bid.sell_amount, &quote).round_dp(4)), true)
             .field("Fees earned", format!("{}",highest_bid.fees_earned), true)
         )
         .embed(serenity::CreateEmbed::new()
@@ -97,7 +94,8 @@ pub async fn orders(
             .field("LP", format!("{}",shorten_address(&lowest_ask.lp)), true)
             .field("ID", format!("{}",lowest_ask.id), true)
             .field("Tick", format!("{}",lowest_ask.tick), true)
-            .field("Sell amount", format!("{}",asset_in_amount(lowest_ask.sell_amount, &asset.to_uppercase())), true)
+            .field("Price", format!("{}",tick_to_price(lowest_ask.tick,&asset.to_uppercase(),&quote)), true)
+            .field("Sell amount", format!("{}",asset_in_amount(lowest_ask.sell_amount, &asset.to_uppercase()).round_dp(4)), true)
             .field("Fees earned", format!("{}",lowest_ask.fees_earned), true)
         )
         .ephemeral(false)
