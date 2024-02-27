@@ -1,4 +1,5 @@
 mod commands;
+mod util;
 
 use poise::serenity_prelude::{self as serenity};
 use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
@@ -10,7 +11,6 @@ pub struct Data {
     http_client: HttpClient,
 }
 
-
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     let token = std::env::var("JITCORD_DISCORD_TOKEN").expect("missing JITCORD_DISCORD_TOKEN env var!");
@@ -21,7 +21,8 @@ async fn main() -> Result<(), Error> {
         .options(poise::FrameworkOptions {
             commands: vec![
                 commands::system::cf_version(),
-                commands::lp::lp()
+                commands::lp::lp(),
+                commands::system::cf_auction_state(),
             ],
             ..Default::default()
         })

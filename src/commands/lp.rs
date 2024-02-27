@@ -6,6 +6,8 @@ use serenity::Colour;
 use serde::Deserialize;
 use web3::types::U256;
 use crate::{Context, Error};
+use crate::util::util::shorten_address;
+
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "")]
@@ -72,15 +74,16 @@ pub async fn orders(
 ) -> Result<(), Error> {
     ctx.defer().await?;
     // TODO: Add valid asset check and error handling. Set default quote asset.
-    let orders: PoolOrders = ctx.data().http_client.request("cf_pool_orders", rpc_params![asset.to_uppercase(),  quote_asset.unwrap_or("USDC".to_string()) ]).await.expect("request failed");
+    let quote =  quote_asset.unwrap_or("USDC".to_string());
+    let orders: PoolOrders = ctx.data().http_client.request("cf_pool_orders", rpc_params![asset.to_uppercase(), &quote]).await.expect("request failed");
     let highest_bid = orders.limit_orders.bids.first().unwrap();
     let lowest_ask = orders.limit_orders.asks.first().unwrap();
     ctx.send(poise::CreateReply::default()
         .embed(serenity::CreateEmbed::new()
-            .title("Highest Bid")
+            .title(format!("Highest Bid {}-{}", asset.to_uppercase(), &quote))
             .colour(Colour::DARK_GREEN)
             // TODO: use some util to shorten IDs
-            .field("LP", format!("{}",highest_bid.lp), true)
+            .field("LP", format!("{}",shorten_address(&highest_bid.lp)), true)
             .field("ID", format!("{}",highest_bid.id), true)
             .field("Tick", format!("{}",highest_bid.tick), true)
             // TODO: Add unit conversion
@@ -88,9 +91,9 @@ pub async fn orders(
             .field("Fees earned", format!("{}",highest_bid.fees_earned), true)
         )
         .embed(serenity::CreateEmbed::new()
-            .title("Lowest Ask")
+            .title(format!("Lowest Ask {}-{}", asset.to_uppercase(), &quote))
             .colour(Colour::DARK_RED)
-            .field("LP", format!("{}",lowest_ask.lp), true)
+            .field("LP", format!("{}",shorten_address(&lowest_ask.lp)), true)
             .field("ID", format!("{}",lowest_ask.id), true)
             .field("Tick", format!("{}",lowest_ask.tick), true)
             .field("Sell amount", format!("{}",lowest_ask.sell_amount), true)
