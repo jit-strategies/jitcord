@@ -72,7 +72,6 @@ pub async fn cf_auction_state(
             .field("Blocks number", format!("{}",block_header.number), true)
             .field("Next rotation", format!("{}",now + Duration::seconds(seconds_to_rotation as i64)), true)
         )
-
         .ephemeral(false)
     ).await?;
     Ok(())

@@ -6,8 +6,9 @@ use serenity::Colour;
 use serde::Deserialize;
 use web3::types::U256;
 use crate::{Context, Error};
-use crate::util::util::shorten_address;
+use crate::util::util::{shorten_address,asset_in_amount};
 
+use rust_decimal::prelude::*;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "")]
@@ -87,7 +88,7 @@ pub async fn orders(
             .field("ID", format!("{}",highest_bid.id), true)
             .field("Tick", format!("{}",highest_bid.tick), true)
             // TODO: Add unit conversion
-            .field("Sell amount", format!("{}",highest_bid.sell_amount), true)
+            .field("Sell amount", format!("{}",asset_in_amount(highest_bid.sell_amount, &quote)), true)
             .field("Fees earned", format!("{}",highest_bid.fees_earned), true)
         )
         .embed(serenity::CreateEmbed::new()
@@ -96,7 +97,7 @@ pub async fn orders(
             .field("LP", format!("{}",shorten_address(&lowest_ask.lp)), true)
             .field("ID", format!("{}",lowest_ask.id), true)
             .field("Tick", format!("{}",lowest_ask.tick), true)
-            .field("Sell amount", format!("{}",lowest_ask.sell_amount), true)
+            .field("Sell amount", format!("{}",asset_in_amount(lowest_ask.sell_amount, &asset.to_uppercase())), true)
             .field("Fees earned", format!("{}",lowest_ask.fees_earned), true)
         )
         .ephemeral(false)
