@@ -8,6 +8,8 @@ use serde::Deserialize;
 use serenity::Colour;
 use web3::types::U256;
 
+const ASSETS: &'static [&str] = &["USDC", "BTC", "ETH", "DOT", "FLIP"];
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "")]
 pub struct LimitOrder {
@@ -73,14 +75,18 @@ pub async fn orders(
     #[description = "Quote asset"] quote_asset: Option<String>,
 ) -> Result<(), Error> {
     ctx.defer().await?;
-    // TODO: Add valid asset check and error handling. Set default quote asset.
+    if !ASSETS.iter().any(|e| asset.contains(e)) {
+        let response = format!("Asset not supported: `{}`", asset);
+        poise::say_reply(ctx, response).await?;
+        return Ok(());
+    }
     let quote = quote_asset.unwrap_or("USDC".to_string());
     let orders: PoolOrders = ctx
         .data()
         .http_client
         .request("cf_pool_orders", rpc_params![asset.to_uppercase(), &quote])
         .await
-        .expect("request failed");
+        .map_err(|err| format!("Request failed: {err}"))?;
     let highest_bid = orders.limit_orders.bids.first().unwrap();
     let lowest_ask = orders.limit_orders.asks.first().unwrap();
     ctx.send(

@@ -7,6 +7,7 @@ use poise::serenity_prelude::{self as serenity};
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
 
+#[derive(Debug)]
 pub struct Data {
     http_client: HttpClient,
 }
