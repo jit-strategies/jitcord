@@ -21,11 +21,7 @@ async fn main() -> Result<(), Error> {
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
-            commands: vec![
-                commands::system::cf_version(),
-                commands::lp::lp(),
-                commands::system::cf_auction_state(),
-            ],
+            commands: vec![commands::cf::cf(), commands::lp::lp()],
             ..Default::default()
         })
         .setup(|ctx, _ready, framework| {

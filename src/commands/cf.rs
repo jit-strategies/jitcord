@@ -7,8 +7,8 @@ use serenity::Colour;
 use std::collections::HashMap;
 use web3::types::{H256, U256, U64};
 
-use time::Duration;
 use time::OffsetDateTime as DateTime;
+use time::{format_description, Duration};
 
 use crate::{Context, Error};
 
@@ -35,9 +35,20 @@ pub struct AuctionState {
     pub min_active_bid: U256,
 }
 
-/// Displays RPC endpoint version
+#[poise::command(
+    prefix_command,
+    slash_command,
+    subcommands("version", "auction"),
+    subcommand_required
+)]
+
+pub async fn cf(_: Context<'_>) -> Result<(), Error> {
+    Ok(())
+}
+
+/// Displays Chainflip endpoint version
 #[poise::command(slash_command, prefix_command)]
-pub async fn cf_version(ctx: Context<'_>) -> Result<(), Error> {
+pub async fn version(ctx: Context<'_>) -> Result<(), Error> {
     ctx.defer().await?;
     let response: String = ctx
         .data()
@@ -60,8 +71,9 @@ pub async fn cf_version(ctx: Context<'_>) -> Result<(), Error> {
 }
 
 #[poise::command(slash_command, prefix_command)]
-pub async fn cf_auction_state(ctx: Context<'_>) -> Result<(), Error> {
+pub async fn auction(ctx: Context<'_>) -> Result<(), Error> {
     ctx.defer().await?;
+    let date_format = format_description::parse("[year]-[month]-[day] [hour]:[minute]:[second]")?;
     let auction: AuctionState = ctx
         .data()
         .http_client
@@ -97,7 +109,12 @@ pub async fn cf_auction_state(ctx: Context<'_>) -> Result<(), Error> {
                     .field("Blocks number", format!("{}", block_header.number), true)
                     .field(
                         "Next rotation",
-                        format!("{}", now + Duration::seconds(seconds_to_rotation as i64)),
+                        format!(
+                            "{} UTC",
+                            (now + Duration::seconds(seconds_to_rotation as i64))
+                                .format(&date_format)
+                                .unwrap()
+                        ),
                         true,
                     ),
             )
