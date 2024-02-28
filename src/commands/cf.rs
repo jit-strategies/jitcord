@@ -6,7 +6,8 @@ use poise::serenity_prelude::{self as serenity};
 use serde::Deserialize;
 use serenity::Colour;
 use std::collections::HashMap;
-use web3::types::{H256, U256, U64};
+use tap::pipe::Pipe;
+use web3::types::{Address, H256, U256, U64};
 
 use time::OffsetDateTime as DateTime;
 use time::{format_description, Duration};
@@ -49,10 +50,29 @@ pub struct SystemHealth {
 #[serde(bound = "")]
 pub struct AccountList(Vec<(String, String)>);
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(bound = "")]
+pub struct AccountInfoV2 {
+    balance: U256,
+    bond: U256,
+    last_heartbeat: u32,
+    reputation_points: u16,
+    keyholder_epochs: Vec<u64>,
+    is_current_authority: bool,
+    is_current_backup: bool,
+    is_qualified: bool,
+    is_online: bool,
+    is_bidding: bool,
+    bound_redeem_address: Option<Address>,
+    apy_bp: u32,
+    #[serde(skip_deserializing)]
+    restricted_balances: Option<HashMap<Address, U256>>,
+}
+
 #[poise::command(
     prefix_command,
     slash_command,
-    subcommands("status", "auction", "search_account"),
+    subcommands("status", "auction", "account_info"),
     subcommand_required
 )]
 pub async fn cf(_: Context<'_>) -> Result<(), Error> {
@@ -157,9 +177,9 @@ pub async fn auction(ctx: Context<'_>) -> Result<(), Error> {
 }
 
 #[poise::command(slash_command, prefix_command)]
-pub async fn search_account(
+pub async fn account_info(
     ctx: Context<'_>,
-    #[description = "Account alias"] name: String,
+    #[description = "Account name or address"] name: String,
 ) -> Result<(), Error> {
     let accounts: AccountList = ctx
         .data()
@@ -169,13 +189,32 @@ pub async fn search_account(
         .expect("request failed");
     match search_account_by_name(&accounts, name) {
         Some(x) => {
+            let account_info: AccountInfoV2 = ctx
+                .data()
+                .http_client
+                .request("cf_account_info_v2", rpc_params![&x.0])
+                .await
+                .expect("request failed");
             ctx.send(
                 poise::CreateReply::default()
                     .embed(
                         serenity::CreateEmbed::new()
                             .title("Account Search")
                             .colour(Colour::DARK_GREY)
-                            .field("Account", format!("{}", x), true),
+                            .field("Account", format!("{}", &x.0), true)
+                            .field("Vanity Name", format!("{}", &x.1), true)
+                            .field("Balance", format!("{}", &account_info.balance), true)
+                            .pipe(|it| {
+                                if account_info.bound_redeem_address.is_some() {
+                                    it.field(
+                                        "Bound Redeem Address",
+                                        format!("{}", &account_info.bound_redeem_address.unwrap()),
+                                        true,
+                                    )
+                                } else {
+                                    it
+                                }
+                            }),
                     )
                     .ephemeral(false),
             )
@@ -188,13 +227,13 @@ pub async fn search_account(
     Ok(())
 }
 
-fn search_account_by_name(accs: &AccountList, name: String) -> Option<String> {
+fn search_account_by_name(accs: &AccountList, name: String) -> Option<(String, String)> {
     let mut accounts = accs.clone();
     accounts
         .0
         .retain(|x| x.1.contains(name.as_str()) || x.0.contains(name.as_str()));
     match accounts.0.len() {
-        len if len > 0 => Some(accounts.0.pop().unwrap().0),
+        len if len > 0 => Some(accounts.0.pop().unwrap()),
         _ => None,
     }
 }
