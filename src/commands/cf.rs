@@ -1,3 +1,4 @@
+use crate::util::util::asset_in_amount;
 use jsonrpsee::core::client::ClientT;
 use jsonrpsee::core::Serialize;
 use jsonrpsee::rpc_params;
@@ -35,34 +36,50 @@ pub struct AuctionState {
     pub min_active_bid: U256,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(bound = "")]
+#[allow(non_snake_case)]
+pub struct SystemHealth {
+    pub peers: u32,
+    pub isSyncing: bool,
+    pub shouldHavePeers: bool,
+}
+
 #[poise::command(
     prefix_command,
     slash_command,
-    subcommands("version", "auction"),
+    subcommands("status", "auction"),
     subcommand_required
 )]
-
 pub async fn cf(_: Context<'_>) -> Result<(), Error> {
     Ok(())
 }
 
-/// Displays Chainflip endpoint version
+/// Displays Chainflip endpoint status
 #[poise::command(slash_command, prefix_command)]
-pub async fn version(ctx: Context<'_>) -> Result<(), Error> {
+pub async fn status(ctx: Context<'_>) -> Result<(), Error> {
     ctx.defer().await?;
-    let response: String = ctx
+    let version: String = ctx
         .data()
         .http_client
         .request("system_version", rpc_params![])
+        .await
+        .expect("request failed");
+    let health: SystemHealth = ctx
+        .data()
+        .http_client
+        .request("system_health", rpc_params![])
         .await
         .expect("request failed");
     ctx.send(
         poise::CreateReply::default()
             .embed(
                 serenity::CreateEmbed::new()
-                    .title("System Version")
+                    .title("System Status")
                     .colour(Colour::DARK_GREY)
-                    .field("Version", response, true),
+                    .field("Version", version, true)
+                    .field("Peers", format!("{}", health.peers), true)
+                    .field("Synced", format!("{}", !health.isSyncing), true),
             )
             .ephemeral(false),
     )
@@ -70,6 +87,7 @@ pub async fn version(ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
 }
 
+/// Displays auction related data
 #[poise::command(slash_command, prefix_command)]
 pub async fn auction(ctx: Context<'_>) -> Result<(), Error> {
     ctx.defer().await?;
@@ -92,6 +110,12 @@ pub async fn auction(ctx: Context<'_>) -> Result<(), Error> {
         .request("cf_current_epoch_started_at", rpc_params![])
         .await
         .expect("request failed");
+    let current_epoch: u32 = ctx
+        .data()
+        .http_client
+        .request("cf_current_epoch", rpc_params![])
+        .await
+        .expect("request failed");
     let seconds_to_rotation: u32 =
         (auction.blocks_per_epoch - (block_header.number.as_u32() - current_epoch_at)) * 6;
     let now = DateTime::now_utc();
@@ -102,11 +126,15 @@ pub async fn auction(ctx: Context<'_>) -> Result<(), Error> {
                     .title("Auction State")
                     .colour(Colour::DARK_GREY)
                     .field(
-                        "Blocks per epoch",
-                        format!("{}", auction.blocks_per_epoch),
+                        "Min. Active Bid",
+                        format!(
+                            "{}",
+                            asset_in_amount(auction.min_active_bid, "FLIP").round_dp(3)
+                        ),
                         true,
                     )
-                    .field("Blocks number", format!("{}", block_header.number), true)
+                    .field("Current block", format!("{}", block_header.number), true)
+                    .field("Current epoch", format!("{}", current_epoch), true)
                     .field(
                         "Next rotation",
                         format!(
