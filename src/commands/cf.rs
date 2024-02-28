@@ -45,10 +45,14 @@ pub struct SystemHealth {
     pub shouldHavePeers: bool,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(bound = "")]
+pub struct AccountList(Vec<(String, String)>);
+
 #[poise::command(
     prefix_command,
     slash_command,
-    subcommands("status", "auction"),
+    subcommands("status", "auction", "search_account"),
     subcommand_required
 )]
 pub async fn cf(_: Context<'_>) -> Result<(), Error> {
@@ -150,4 +154,47 @@ pub async fn auction(ctx: Context<'_>) -> Result<(), Error> {
     )
     .await?;
     Ok(())
+}
+
+#[poise::command(slash_command, prefix_command)]
+pub async fn search_account(
+    ctx: Context<'_>,
+    #[description = "Account alias"] name: String,
+) -> Result<(), Error> {
+    let accounts: AccountList = ctx
+        .data()
+        .http_client
+        .request("cf_accounts", rpc_params![])
+        .await
+        .expect("request failed");
+    match search_account_by_name(&accounts, name) {
+        Some(x) => {
+            ctx.send(
+                poise::CreateReply::default()
+                    .embed(
+                        serenity::CreateEmbed::new()
+                            .title("Account Search")
+                            .colour(Colour::DARK_GREY)
+                            .field("Account", format!("{}", x), true),
+                    )
+                    .ephemeral(false),
+            )
+            .await?;
+        }
+        None => {
+            poise::say_reply(ctx, "Not found").await?;
+        }
+    };
+    Ok(())
+}
+
+fn search_account_by_name(accs: &AccountList, name: String) -> Option<String> {
+    let mut accounts = accs.clone();
+    accounts
+        .0
+        .retain(|x| x.1.contains(name.as_str()) || x.0.contains(name.as_str()));
+    match accounts.0.len() {
+        len if len > 0 => Some(accounts.0.pop().unwrap().0),
+        _ => None,
+    }
 }
