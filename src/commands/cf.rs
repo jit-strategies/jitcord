@@ -1,4 +1,4 @@
-use crate::util::util::asset_in_amount;
+use crate::util::util::{asset_in_amount, bool_to_emoji};
 use jsonrpsee::core::client::ClientT;
 use jsonrpsee::core::Serialize;
 use jsonrpsee::rpc_params;
@@ -68,7 +68,7 @@ pub struct AccountInfoV2 {
     is_online: bool,
     is_bidding: bool,
     bound_redeem_address: Option<Address>,
-    apy_bp: u32,
+    apy_bp: Option<u32>,
     #[serde(skip_deserializing)]
     restricted_balances: Option<HashMap<Address, U256>>,
 }
@@ -203,11 +203,23 @@ pub async fn account_info(
                 poise::CreateReply::default()
                     .embed(
                         serenity::CreateEmbed::new()
-                            .title("Account Search")
+                            .title("Account Info")
                             .colour(Colour::DARK_GREY)
-                            .field("Account", format!("{}", &x.0), true)
+                            .field("Account", format!("{}", &x.0), false)
                             .field("Vanity Name", format!("{}", &x.1), true)
-                            .field("Balance", format!("{}", &account_info.balance), true)
+                            .field(
+                                "Balance",
+                                format!(
+                                    "{}",
+                                    asset_in_amount(account_info.balance, "FLIP").round_dp(4)
+                                ),
+                                true,
+                            )
+                            .field(
+                                "Reputation",
+                                format!("{}", &account_info.reputation_points),
+                                true,
+                            )
                             .pipe(|it| {
                                 if account_info.bound_redeem_address.is_some() {
                                     it.field(
@@ -218,14 +230,39 @@ pub async fn account_info(
                                 } else {
                                     it
                                 }
-                            }),
+                            })
+                            .field(
+                                "Online",
+                                format!("{}", bool_to_emoji(account_info.is_online)),
+                                true,
+                            )
+                            .field(
+                                "Bidding",
+                                format!("{}", bool_to_emoji(account_info.is_bidding)),
+                                true,
+                            )
+                            .field(
+                                "Authority",
+                                format!("{}", bool_to_emoji(account_info.is_current_authority)),
+                                true,
+                            )
+                            .field(
+                                "Qualified",
+                                format!("{}", bool_to_emoji(account_info.is_qualified)),
+                                true,
+                            )
+                            .field(
+                                "Backup",
+                                format!("{}", bool_to_emoji(account_info.is_current_backup)),
+                                true,
+                            ),
                     )
                     .ephemeral(false),
             )
             .await?;
         }
         None => {
-            poise::say_reply(ctx, "Not found").await?;
+            poise::say_reply(ctx, "Account or vanity name not found").await?;
         }
     };
     Ok(())

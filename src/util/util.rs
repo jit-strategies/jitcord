@@ -41,3 +41,10 @@ pub fn tick_to_price(tick: i32, base_asset: &str, quote_asset: &str) -> f32 {
             .to_f32()
             .unwrap())
 }
+
+pub fn bool_to_emoji(b: bool) -> String {
+    match b {
+        true => "✅".to_string(),
+        _ => "❌".to_string(),
+    }
+}
