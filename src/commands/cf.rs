@@ -48,7 +48,11 @@ pub struct SystemHealth {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "")]
-pub struct AccountList(Vec<(String, String)>);
+pub struct AccountList(Vec<AccountPair>);
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(bound = "")]
+struct AccountPair(String, String);
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "")]
@@ -227,11 +231,11 @@ pub async fn account_info(
     Ok(())
 }
 
-fn search_account_by_name(accs: &AccountList, name: String) -> Option<(String, String)> {
+fn search_account_by_name(accs: &AccountList, name: String) -> Option<AccountPair> {
     let mut accounts = accs.clone();
     accounts
         .0
-        .retain(|x| x.1.contains(name.as_str()) || x.0.contains(name.as_str()));
+        .retain(|x| x.0.contains(name.as_str()) || x.1.contains(name.as_str()));
     match accounts.0.len() {
         len if len > 0 => Some(accounts.0.pop().unwrap()),
         _ => None,
