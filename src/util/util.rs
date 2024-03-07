@@ -10,7 +10,7 @@ pub fn shorten_address(addr: &String) -> String {
     )
 }
 
-pub fn asset_in_amount(amount: U256, asset: &str) -> Decimal {
+pub fn asset_in_amount(amount: &U256, asset: &str) -> Decimal {
     let amount_i128 = amount.as_u128() as i128;
     match asset {
         "USDC" => Decimal::from_i128_with_scale(amount_i128, 6),

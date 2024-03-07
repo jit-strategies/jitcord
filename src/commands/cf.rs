@@ -2,10 +2,10 @@ use crate::util::util::{asset_in_amount, bool_to_emoji};
 use jsonrpsee::core::client::ClientT;
 use jsonrpsee::core::Serialize;
 use jsonrpsee::rpc_params;
-use poise::serenity_prelude::{self as serenity};
+use poise::serenity_prelude::{self as serenity, CreateEmbed};
 use serde::Deserialize;
 use serenity::Colour;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use tap::pipe::Pipe;
 use web3::types::{Address, H256, U256, U64};
 
@@ -13,6 +13,8 @@ use time::OffsetDateTime as DateTime;
 use time::{format_description, Duration};
 
 use crate::{Context, Error};
+
+const DATE_FORMAT: &str = "[year]-[month]-[day] [hour]:[minute]:[second]";
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "")]
@@ -73,6 +75,37 @@ pub struct AccountInfoV2 {
     restricted_balances: Option<HashMap<Address, U256>>,
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "role", rename_all = "snake_case")]
+pub enum AccountInfo {
+    Unregistered {
+        flip_balance: U256,
+    },
+    Broker {
+        flip_balance: U256,
+    },
+    LiquidityProvider {
+        balances: HashMap<String, HashMap<String, U256>>,
+        refund_addresses: HashMap<String, Option<String>>,
+        flip_balance: U256,
+    },
+    Validator {
+        flip_balance: U256,
+        bond: U256,
+        last_heartbeat: u32,
+        reputation_points: i32,
+        keyholder_epochs: Vec<u32>,
+        is_current_authority: bool,
+        is_current_backup: bool,
+        is_qualified: bool,
+        is_online: bool,
+        is_bidding: bool,
+        bound_redeem_address: Option<Address>,
+        apy_bp: Option<u32>,
+        restricted_balances: BTreeMap<Address, U256>,
+    },
+}
+
 #[poise::command(
     prefix_command,
     slash_command,
@@ -102,7 +135,7 @@ pub async fn status(ctx: Context<'_>) -> Result<(), Error> {
     ctx.send(
         poise::CreateReply::default()
             .embed(
-                serenity::CreateEmbed::new()
+                CreateEmbed::new()
                     .title("System Status")
                     .colour(Colour::DARK_GREY)
                     .field("Version", version, true)
@@ -119,7 +152,7 @@ pub async fn status(ctx: Context<'_>) -> Result<(), Error> {
 #[poise::command(slash_command, prefix_command)]
 pub async fn auction(ctx: Context<'_>) -> Result<(), Error> {
     ctx.defer().await?;
-    let date_format = format_description::parse("[year]-[month]-[day] [hour]:[minute]:[second]")?;
+    let date_format = format_description::parse(DATE_FORMAT)?;
     let auction: AuctionState = ctx
         .data()
         .http_client
@@ -150,14 +183,14 @@ pub async fn auction(ctx: Context<'_>) -> Result<(), Error> {
     ctx.send(
         poise::CreateReply::default()
             .embed(
-                serenity::CreateEmbed::new()
+                CreateEmbed::new()
                     .title("Auction State")
                     .colour(Colour::DARK_GREY)
                     .field(
                         "Min. Active Bid",
                         format!(
                             "{}",
-                            asset_in_amount(auction.min_active_bid, "FLIP").round_dp(3)
+                            asset_in_amount(&auction.min_active_bid, "FLIP").round_dp(3)
                         ),
                         true,
                     )
@@ -192,74 +225,112 @@ pub async fn account_info(
         .await
         .expect("request failed");
     match search_account_by_name(&accounts, name) {
-        Some(x) => {
-            let account_info: AccountInfoV2 = ctx
+        Some(acc) => {
+            let account_info: AccountInfo = ctx
                 .data()
                 .http_client
-                .request("cf_account_info_v2", rpc_params![&x.0])
+                .request("cf_account_info", rpc_params![&acc.0])
                 .await
                 .expect("request failed");
-            ctx.send(
-                poise::CreateReply::default()
-                    .embed(
-                        serenity::CreateEmbed::new()
-                            .title("Account Info")
-                            .colour(Colour::DARK_GREY)
-                            .field("Account", format!("{}", &x.0), false)
-                            .field("Vanity Name", format!("{}", &x.1), true)
-                            .field(
-                                "Balance",
-                                format!(
-                                    "{}",
-                                    asset_in_amount(account_info.balance, "FLIP").round_dp(4)
-                                ),
-                                true,
-                            )
-                            .field(
-                                "Reputation",
-                                format!("{}", &account_info.reputation_points),
-                                true,
-                            )
-                            .pipe(|it| {
-                                if account_info.bound_redeem_address.is_some() {
-                                    it.field(
-                                        "Bound Redeem Address",
-                                        format!("{}", &account_info.bound_redeem_address.unwrap()),
+            match account_info {
+                AccountInfo::LiquidityProvider {
+                    balances,
+                    flip_balance,
+                    ..
+                } => {
+                    ctx.send(
+                        poise::CreateReply::default()
+                            .embed(
+                                CreateEmbed::new()
+                                    .title("Liquidity Provider")
+                                    .colour(Colour::GOLD)
+                                    .field("Account", format!("{}", &acc.0), false)
+                                    //.field("Vanity Name", format!("{}", &acc.1), true)
+                                    .field(
+                                        "Liquidity Balances",
+                                        balance_map_format(&balances),
                                         true,
                                     )
-                                } else {
-                                    it
-                                }
-                            })
-                            .field(
-                                "Online",
-                                format!("{}", bool_to_emoji(account_info.is_online)),
-                                true,
+                                    .field(
+                                        "Account Balance (FLIP)",
+                                        format!(
+                                            "{}",
+                                            asset_in_amount(&flip_balance, "FLIP").round_dp(4)
+                                        ),
+                                        true,
+                                    ),
                             )
-                            .field(
-                                "Bidding",
-                                format!("{}", bool_to_emoji(account_info.is_bidding)),
-                                true,
-                            )
-                            .field(
-                                "Authority",
-                                format!("{}", bool_to_emoji(account_info.is_current_authority)),
-                                true,
-                            )
-                            .field(
-                                "Qualified",
-                                format!("{}", bool_to_emoji(account_info.is_qualified)),
-                                true,
-                            )
-                            .field(
-                                "Backup",
-                                format!("{}", bool_to_emoji(account_info.is_current_backup)),
-                                true,
-                            ),
+                            .ephemeral(false),
                     )
-                    .ephemeral(false),
-            )
-            .await?;
+                    .await?;
+                }
+                AccountInfo::Validator {
+                    flip_balance,
+                    reputation_points,
+                    bound_redeem_address,
+                    is_online,
+                    is_bidding,
+                    is_current_authority,
+                    is_qualified,
+                    is_current_backup,
+                    ..
+                } => {
+                    ctx.send(
+                        poise::CreateReply::default()
+                            .embed(
+                                CreateEmbed::new()
+                                    .title("Validator")
+                                    .colour(Colour::DARK_GREY)
+                                    .field("Account", format!("{}", &acc.0), false)
+                                    .field("Vanity Name", format!("{}", &acc.1), true)
+                                    .field(
+                                        "Balance",
+                                        format!(
+                                            "{}",
+                                            asset_in_amount(&flip_balance, "FLIP").round_dp(4)
+                                        ),
+                                        true,
+                                    )
+                                    .field("Reputation", format!("{}", &reputation_points), true)
+                                    .pipe(|it| {
+                                        if bound_redeem_address.is_some() {
+                                            it.field(
+                                                "Bound Redeem Address",
+                                                format!("{}", &bound_redeem_address.unwrap()),
+                                                true,
+                                            )
+                                        } else {
+                                            it
+                                        }
+                                    })
+                                    .field("Online", format!("{}", bool_to_emoji(is_online)), true)
+                                    .field(
+                                        "Bidding",
+                                        format!("{}", bool_to_emoji(is_bidding)),
+                                        true,
+                                    )
+                                    .field(
+                                        "Authority",
+                                        format!("{}", bool_to_emoji(is_current_authority)),
+                                        true,
+                                    )
+                                    .field(
+                                        "Qualified",
+                                        format!("{}", bool_to_emoji(is_qualified)),
+                                        true,
+                                    )
+                                    .field(
+                                        "Backup",
+                                        format!("{}", bool_to_emoji(is_current_backup)),
+                                        true,
+                                    ),
+                            )
+                            .ephemeral(false),
+                    )
+                    .await?;
+                }
+                _ => {}
+            }
         }
         None => {
             poise::say_reply(ctx, "Account or vanity name not found").await?;
@@ -277,4 +348,17 @@ fn search_account_by_name(accs: &AccountList, name: String) -> Option<AccountPai
         len if len > 0 => Some(accounts.0.pop().unwrap()),
         _ => None,
     }
+}
+
+fn balance_map_format(balances: &HashMap<String, HashMap<String, U256>>) -> String {
+    let mut balances_formatted = String::from("");
+    for (key, val) in &*balances {
+        balances_formatted.push_str(format!("{}\n", key).as_str());
+        for (ikey, ival) in val {
+            balances_formatted.push_str(
+                format!("{}: {}\n", ikey, asset_in_amount(ival, ikey).round_dp(4)).as_str(),
+            );
+        }
+    }
+    balances_formatted
 }

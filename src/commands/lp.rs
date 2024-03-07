@@ -110,7 +110,7 @@ pub async fn orders(
                         "Sell amount",
                         format!(
                             "{}",
-                            asset_in_amount(highest_bid.sell_amount, &quote).round_dp(4)
+                            asset_in_amount(&highest_bid.sell_amount, &quote).round_dp(4)
                         ),
                         true,
                     )
@@ -135,7 +135,7 @@ pub async fn orders(
                         "Sell amount",
                         format!(
                             "{}",
-                            asset_in_amount(lowest_ask.sell_amount, &asset.to_uppercase())
+                            asset_in_amount(&lowest_ask.sell_amount, &asset.to_uppercase())
                                 .round_dp(4)
                         ),
                         true,
