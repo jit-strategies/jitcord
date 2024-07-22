@@ -7,8 +7,7 @@ COPY ./src ./src
 RUN cargo chef prepare
 
 FROM chef AS builder
-RUN apk update && apk upgrade && apk add --no-cache ca-certificates
-RUN update-ca-certificates
+RUN apk update && apk upgrade && apk add --no-cache ca-certificates openssl-dev openssl-libs-static build-base
 COPY --from=planner /app/recipe.json .
 RUN cargo chef cook --release
 COPY . .

@@ -83,7 +83,7 @@ pub async fn orders(
     let quote = quote_asset.unwrap_or("USDC".to_string());
     let orders: PoolOrders = ctx
         .data()
-        .http_client
+        .cf_client
         .request("cf_pool_orders", rpc_params![asset.to_uppercase(), &quote])
         .await
         .map_err(|err| format!("Request failed: {err}"))?;

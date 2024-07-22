@@ -9,7 +9,7 @@ type Context<'a> = poise::Context<'a, Data, Error>;
 
 #[derive(Debug)]
 pub struct Data {
-    http_client: HttpClient,
+    cf_client: HttpClient,
 }
 
 #[tokio::main]
@@ -21,7 +21,7 @@ async fn main() -> Result<(), Error> {
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
-            commands: vec![commands::cf::cf(), commands::lp::lp()],
+            commands: vec![commands::cf::cf(), commands::lp::lp(), commands::pd::pd()],
             ..Default::default()
         })
         .setup(|ctx, _ready, framework| {
@@ -29,7 +29,7 @@ async fn main() -> Result<(), Error> {
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
                 let client = HttpClientBuilder::default().build(target).unwrap();
                 Ok(Data {
-                    http_client: client,
+                    cf_client: client,
                 })
             })
         })

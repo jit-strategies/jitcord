@@ -122,13 +122,13 @@ pub async fn status(ctx: Context<'_>) -> Result<(), Error> {
     ctx.defer().await?;
     let version: String = ctx
         .data()
-        .http_client
+        .cf_client
         .request("system_version", rpc_params![])
         .await
         .expect("request failed");
     let health: SystemHealth = ctx
         .data()
-        .http_client
+        .cf_client
         .request("system_health", rpc_params![])
         .await
         .expect("request failed");
@@ -155,25 +155,25 @@ pub async fn auction(ctx: Context<'_>) -> Result<(), Error> {
     let date_format = format_description::parse(DATE_FORMAT)?;
     let auction: AuctionState = ctx
         .data()
-        .http_client
+        .cf_client
         .request("cf_auction_state", rpc_params![])
         .await
         .expect("request failed");
     let block_header: BlockHeader = ctx
         .data()
-        .http_client
+        .cf_client
         .request("chain_getHeader", rpc_params![])
         .await
         .expect("request failed");
     let current_epoch_at: u32 = ctx
         .data()
-        .http_client
+        .cf_client
         .request("cf_current_epoch_started_at", rpc_params![])
         .await
         .expect("request failed");
     let current_epoch: u32 = ctx
         .data()
-        .http_client
+        .cf_client
         .request("cf_current_epoch", rpc_params![])
         .await
         .expect("request failed");
@@ -220,7 +220,7 @@ pub async fn account_info(
 ) -> Result<(), Error> {
     let accounts: AccountList = ctx
         .data()
-        .http_client
+        .cf_client
         .request("cf_accounts", rpc_params![])
         .await
         .expect("request failed");
@@ -228,7 +228,7 @@ pub async fn account_info(
         Some(acc) => {
             let account_info: AccountInfo = ctx
                 .data()
-                .http_client
+                .cf_client
                 .request("cf_account_info", rpc_params![&acc.0])
                 .await
                 .expect("request failed");

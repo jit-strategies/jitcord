@@ -1,6 +1,5 @@
-use jsonrpsee::core::client::ClientT;
 use jsonrpsee::core::Serialize;
-use jsonrpsee::rpc_params;
+use crate::{Context, Error};
 use poise::serenity_prelude::{self as serenity, CreateEmbed};
 use serde::Deserialize;
 use serenity::Colour;
@@ -39,7 +38,7 @@ pub struct PdData {
 #[poise::command(
     prefix_command,
     slash_command,
-    subcommands("trigger", "list"),
+    subcommands("trigger"),
     subcommand_required
 )]
 pub async fn pd(_: Context<'_>) -> Result<(), Error> {
@@ -47,40 +46,37 @@ pub async fn pd(_: Context<'_>) -> Result<(), Error> {
 }
 
 #[poise::command(prefix_command, slash_command)]
-pub async fn pd_trigger(
+pub async fn trigger(
     ctx: Context<'_>,
     #[description = "Summary of the alert"] summary: String,
     #[description = "Severity of the alert"] severity: String,
 ) -> Result<(), Error> {
+    let source = "JITCORD".to_string();
     let data = PdData {
         payload: PdPayload {
             summary,
             severity,
             source,
         },
-        routing_key: std::env::var("JIDCORD_PAGERDUTY_KEY").unwrap(),
+        routing_key: std::env::var("JITCORD_PAGERDUTY_KEY").unwrap(),
         event_action: "trigger".to_string(),
     };
-
+    std::env::var("JITCORD_PAGERDUTY_KEY").expect("missing JITCORD_PAGERDUTY_KEY env var!");
     let client = reqwest::Client::new();
     let res = client
         .post("https://events.eu.pagerduty.com/v2/enqueue")
-        .header("Content-Type", "application/json")
         .json(&data)
+        .header("Content-Type", "application/json")
         .send()
         .await?;
 
     let res_text = res.text().await?;
-    let res_json: serde_json::Value = serde_json::from_str(&res_text)?;
-
     let embed = CreateEmbed::default()
         .title("PagerDuty Alert")
-        .field("Summary", summary, false)
-        .field("Severity", severity, false)
-        .field("Response", res_json, false)
+        .field("Summary", data.payload.summary, false)
+        .field("Severity", data.payload.severity, false)
+        .field("Response", res_text, false)
         .colour(Colour::DARK_PURPLE);
-
-    poise::send_reply(ctx, |f| f.set_embed(embed)).await?;
-
+    ctx.send(poise::CreateReply::default().embed(embed)).await?;
     Ok(())
 }
