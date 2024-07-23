@@ -3,7 +3,7 @@ use crate::{Context, Error};
 use poise::serenity_prelude::{self as serenity, CreateEmbed};
 use serde::Deserialize;
 use serenity::Colour;
-
+use futures::{Stream, StreamExt};
 
 // Example call
 // curl --request 'POST' \
@@ -49,7 +49,9 @@ pub async fn pd(_: Context<'_>) -> Result<(), Error> {
 pub async fn trigger(
     ctx: Context<'_>,
     #[description = "Summary of the alert"] summary: String,
-    #[description = "Severity of the alert"] severity: String,
+    #[description = "Severity of the alert"]
+    #[autocomplete = "autocomplete_severity"]
+    severity: String,
 ) -> Result<(), Error> {
     let source = "JITCORD".to_string();
     let data = PdData {
@@ -79,4 +81,13 @@ pub async fn trigger(
         .colour(Colour::DARK_PURPLE);
     ctx.send(poise::CreateReply::default().embed(embed)).await?;
     Ok(())
+}
+
+async fn autocomplete_severity<'a>(
+    _ctx: Context<'_>,
+    partial: &'a str,
+) -> impl Stream<Item = String> + 'a {
+    futures::stream::iter(&["critical", "warning", "error", "info"])
+        .filter(move |name| futures::future::ready(name.starts_with(partial)))
+        .map(|name| name.to_string())
 }
